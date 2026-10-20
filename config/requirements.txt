@@ -1,0 +1,11 @@
+torch==2.8.0+cu128
+numpy==1.26.4
+pandas==2.3.3
+scipy==1.15.2
+scikit-learn==1.7.2
+h5py==3.16.0
+PyYAML==6.0.2
+matplotlib==3.10.9
+pillow==12.2.0
+openpyxl==3.1.5
+anndata==0.10.8

@@ -1,0 +1,94 @@
+schema_version: sound_vaccine_immunetwin_2
+seed: 42
+
+paper_methods:
+  current: ImmuneTwin-ProjectedSetOperator
+
+task_training:
+  mode: independent_task_outer_fold
+  outer_folds: 5
+  inner_validation_fold: 0
+  independent_unit: donor
+  preserve_source_composition: true
+  donor_identifier_as_feature: false
+  test_time_gradient_updates: false
+
+# The affine model is fixed; only the shape-refinement operator on
+# standardized cell sets is trained.
+model:
+  uce_dim: 1280
+  visit_dim: 128
+  attention_dim: 64
+  visit_pooling: attention_only
+  latent_dim: 16
+  phase_count: 3
+  phase_dim: 16
+  transition_hidden_dim: 128
+  current_operator: moment_fiber
+  mean_program_rank: 7
+  covariance_program_rank: 11
+  source_geometry_dim: 64
+  operator_slot_count: 8
+  operator_depth: 4
+  operator_rank: 8
+  fiber_context: adaptive
+  fiber_retraction: adaptive_final
+
+pretraining:
+  checkpoint: ${FROZEN_RESULTS}/age/simple_v1/attention/full_cima/checkpoint.pt
+  load_parameters: [cell_projection, pool]
+  exclude_parameters: [age_head]
+  freeze_pretrained_encoder: true
+  warmup_frozen_epochs: 0
+  encoder_learning_rate_multiplier: 0.0
+
+features:
+  query_uce_cells: 512
+  support_uce_cells: 512
+  training_latent_cells: 512
+  prediction_latent_cells: 2048
+  gene_summary: disabled_for_current
+  gene_selection: disabled_for_current
+
+clinical:
+  mode: "off"
+  mode_by_arm:
+    current: "off"
+
+response_transform:
+  fit_scope_selection: inner_fit_donors_only
+  fit_scope_final: outer_training_donors_only
+  scale_floor: 0.001
+  mean_program_basis: uncentered_donor_response_svd
+  covariance_program_basis: uncentered_donor_covariance_change_svd
+  relative_covariance_bounds: training_unit_q01_q99
+
+optimization:
+  batch_size_donors: 8
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  maximum_epochs: 150
+  patience: 15
+  gradient_clip_norm: 5.0
+  precision: bfloat16_mixed_except_distribution_and_moment_retractions_float32
+
+selection:
+  objective: distribution_mmd2
+  direction: lower
+
+loss:
+  distribution_weight: 1.0
+  response_mean_weight: 1.0
+  response_direction_weight: 0.25
+  response_norm_weight: 0.25
+  centered_geometry_weight: 0.50
+  geometry_gram_fraction: 0.25
+  history_sensitivity_weight: 0.0
+  history_current_anchor_weight: 0.0
+  geometry_scale_floor: 0.001
+  epsilon: 1.0e-8
+
+execution:
+  reserved_gpus: [0]
+  candidate_gpus: [1, 2, 3, 4, 5, 6, 7]
+  scale_up_rule: measured_moment_fiber_pilot

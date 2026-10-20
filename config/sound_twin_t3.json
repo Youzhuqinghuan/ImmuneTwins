@@ -1,0 +1,53 @@
+{
+  "schema_version": "sound_meta_adapter_architecture_freeze_1",
+  "paper_method": "ImmuneTwins (full)",
+  "implementation": "history_generated_shared_basis_lora_1",
+  "version": "v1.1",
+  "seed": 42,
+  "parent_method": "ImmuneTwin-ProjectedSet",
+  "history_input": {
+    "variant": "rna",
+    "token_mode": "transition",
+    "quantities": [
+      "support_source_latent_mean",
+      "support_target_latent_mean",
+      "support_response_latent"
+    ],
+    "gene_attention": false,
+    "clinical_history": false
+  },
+  "twin_config": {
+    "context_dim": 64,
+    "visit_slots": 2,
+    "context_layers": 1,
+    "context_heads": 4,
+    "adapter_rank": 8,
+    "adapter_scale": 0.5,
+    "gene_embedding_dim": 32,
+    "clinical_value_dim": 0,
+    "use_gene_attention": false,
+    "use_clinical_history": false,
+    "use_visit_tokens": false,
+    "gene_dropout": 0.0
+  },
+  "optimization": {
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 8,
+    "epoch_selection": "minimum_donor_weighted_four_fold_common_validation_curve",
+    "selection_metric": "raw_donor_delta_rmse"
+  },
+  "loss": {
+    "distribution_weight": 1.0,
+    "response_mean_weight": 2.0,
+    "response_direction_weight": 0.5,
+    "response_norm_weight": 0.5,
+    "centered_geometry_weight": 0.75,
+    "history_sensitivity_weight": 0.5,
+    "history_sensitivity_temperature": 0.05,
+    "history_current_anchor_weight": 0.25,
+    "history_current_anchor_temperature": 0.1
+  },
+  "t1_policy": "exact_projected_set_alias_when_history_is_empty",
+  "outer_test_policy": "architecture_loss_and_epoch_selection_use_outer_training_donors_only"
+}

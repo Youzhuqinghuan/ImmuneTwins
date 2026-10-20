@@ -1,0 +1,19 @@
+project_root: ${WORKSPACE}
+source_root: ${REPO}
+artifact_root: ${REPO}/artifacts
+result_root: ${REPO}/results
+log_root: ${REPO}/results/logs
+document_root: ${REPO}/reports
+vaccine_baseline_runtime: ${WORKSPACE}/vaccine_baseline_runtime
+age_external:
+  onek1k_raw_h5ad: ${WORKSPACE}/data/external/onek1k/OneK1K_1e44db10/raw/OneK1K_1e44db10.h5ad
+  onek1k_fixed_view: ${WORKSPACE}/data/external/onek1k/fixed_view/onek1k_seed20260711_max1500_raw_counts.h5
+  onek1k_donor_manifest: ${WORKSPACE}/data/external/onek1k/fixed_view/onek1k_seed20260711_max1500_donors.tsv
+  onek1k_result_root: ${WORKSPACE}/results/official_age_baselines/OneK1K
+sound:
+  visit_manifest: ${EXTERNAL}/data/manifests/sound_visit_manifest.tsv
+  flu_manifest: ${WORKSPACE}/vaccine_baseline_runtime/data/episode_manifests/sound_flu_episodes.tsv
+  outer_splits: ${WORKSPACE}/vaccine_baseline_runtime/config/splits/sound_outer_groupkfold5_donors.tsv
+  inner_splits: ${WORKSPACE}/vaccine_baseline_runtime/config/splits/sound_inner_groupkfold4_donors.tsv
+  latent_maps: ${WORKSPACE}/vaccine_baseline_runtime/config/runtime/outer{fold}_latent_map.json
+  metric_maps: ${WORKSPACE}/vaccine_baseline_runtime/config/runtime/outer{fold}_scale_map.json

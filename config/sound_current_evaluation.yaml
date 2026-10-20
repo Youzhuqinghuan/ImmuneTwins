@@ -1,0 +1,124 @@
+schema_version: sound_vaccine_donor_evaluation_v2
+updated: 2026-08-30
+
+result_boundary:
+  runtime_schema: sound_vaccine_immunetwin_runtime_2
+  protocol_schema: sound_vaccine_immunetwin_protocol_2
+  protocol_scope: current_only
+  diagnostic_v1_results_allowed_as_formal_input: false
+  exact_training_jobs: 15
+  seed: 42
+
+model_boundary:
+  paper_method: ImmuneTwin-current
+  inputs: [current_visit_rna, task_phase]
+  history_used: false
+  clinical_information_used: false
+  donor_identifier_as_feature: false
+  test_time_gradient_updates: false
+
+independent_unit: donor
+prediction_unit: task_donor_season_target
+nested_nonindependent_units:
+  - cells_within_visit
+  - visits_within_donor
+  - seasons_within_donor
+  - lineage_views_of_one_prediction
+  - evaluation_resampling_draws
+
+split:
+  method: donor_blocked_groupkfold
+  outer_folds: 5
+  group_key: donor
+  hold_out_all_visits_and_seasons_together: true
+  forbid_test_target_training: true
+  forbid_test_target_adaptation: true
+  inner_selection_preprocessing_fit_scope: component_specific_with_outer_training_rna_coordinates
+  inner_selection_preprocessing_components:
+    rna_coordinates_center_scale: outer_training_fitted_and_reused
+    stage_specific_response_transforms: see_selection_preprocessing_record
+  final_refit_preprocessing_fit_scope: outer_training_donors_only
+
+tasks:
+  T1_first_response:
+    id: t1_y1_d0_to_y1_d7
+    source: year1_D0
+    target: year1_D7
+    prediction_units: 83
+    unique_donors: 83
+  T2_same_episode_recovery:
+    id: t2_d7_to_d90
+    source: same_season_D7
+    target: same_season_D90
+    prediction_units: 163
+    unique_donors: 88
+    repeated_unit: season_within_donor
+  T3_cross_year_recovery:
+    id: t3_y2_d0_to_y2_d90
+    source: year2_D0
+    target: year2_D90
+    prediction_units: 75
+    unique_donors: 75
+
+evaluation:
+  representation: fold_specific_outer_training_frozen_scvi_16d
+  never_pool_vectors_across_outer_fold_coordinate_systems: true
+  evaluation_draws: 20
+  evaluation_cells_per_distribution_draw: 256
+  evaluation_draw_sampling: without_replacement_from_saved_2048_cells
+  technical_draw_seed: 42
+  terminal_distribution:
+    name: biased_rbf_mmd_squared
+    direction: lower
+    estimator: biased_v_statistic
+    kernel: exp(-squared_euclidean/(2*fold_bandwidth_squared))
+    nonnegative_clamp: true
+    preprocessing: outer_training_center_and_scale
+    bandwidth: fold_specific_outer_training_mmd_bandwidth
+    implementation: evaluation.distribution.rbf_mmd2_biased
+  sinkhorn_reported_or_claimed: false
+  response_metrics:
+    delta_rmse: lower
+    delta_mae: lower
+    response_cosine: higher
+    response_mrr_excess: higher
+  collapse_diagnostics:
+    response_dispersion_ratio: target_one
+    response_norm_ratio: target_one
+    recompute_inside_donor_bootstrap: true
+
+publication_rescore:
+  retrieval_permutations: 500
+  lineage_draws: 5
+  lineage_cells: 64
+  lineage_min_cells: 32
+
+paired_comparison:
+  independent_baselines: [scGen, CellOT, trVAE, UCE, PULSAR]
+  controls_excluded_from_strongest_baseline_selection: [Random, Persistence]
+  project_initialization_control_excluded: [CIMA-pretrained UCE]
+
+aggregation:
+  evaluation_draws: average_within_prediction_unit
+  T1: one_prediction_per_donor
+  T2: equal_average_seasons_within_donor_before_task_summary
+  T3: one_prediction_per_donor
+  donors: equal_weight_macro_average
+  weight_by_cell_count: false
+  weight_by_number_of_seasons: false
+  lineages_are_independent_replicates: false
+
+uncertainty:
+  interval: percentile_95ci
+  method: donor_cluster_bootstrap
+  draws: 10000
+  bootstrap_seed: 20260829
+  resampling_key: donor
+  carry_all_nested_units_with_resampled_donor: true
+  single_training_seed_is_not_inferential_replication: true
+
+reporting:
+  n_definition: unique_held_out_donors
+  T2_also_report_n_donor_seasons: true
+  points_in_main_figures: donors
+  common_method_support_required: true

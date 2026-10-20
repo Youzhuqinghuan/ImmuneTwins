@@ -1,0 +1,245 @@
+schema_version: immunetwins_drug_discovery_shared_vaccine_logic_v2
+seed: 42
+outer_folds: 5
+shared_architecture:
+  reference: config/sound_twin_t3.json
+  model_class: model.digital_twin.MetaAdapterDigitalTwin
+  output: predicted_cells
+  external_prediction_gate: forbidden
+  task_components:
+  - native_history_response_recovery
+clinical_application:
+  name: baseline_myeloma_treatment_response
+  output_root: ${REPO}/results/treatment/response
+  features_root: ${WORKSPACE}/data/ImmuneTwins/drug_discovery_mm/features
+  source_cohort: GSE161195
+  prediction_landmark: Baseline
+  endpoint: published_KYDAR_nonresponse_failure_to_achieve_PR_at_6_months
+  endpoint_label_source: PERCEPTION_resp_info_xlsx_patient_mapping
+  auxiliary_state_supervision: training_patients_only_Baseline_to_Cycle_4
+  history_at_prediction: empty_no_post_treatment_input
+  shared_model: CIMA_SetTransport_ProjectedSet_MetaAdapter
+  task_adaptation: linear_response_head_with_fixed_training_only_RBF_set_pooling
+  readout_features: native_distribution_rbf32
+  projected_selection_metric: distribution_mmd2
+  head_prior_correction: true
+  fixed_signature_path: ${FROZEN_RESULTS}/drug_discovery_mm/response_closure_20260907/biology/source_locked_signature.json
+  state_results: ${FROZEN_RESULTS}/drug_discovery_mm/task_adaptation_20260908/state_evaluation/state_method_by_metric.tsv
+  latent_genes: 2048
+  cells_per_visit: 64
+  inner_folds: 3
+  set_max_epochs: 150
+  set_patience: 20
+  projected_max_epochs: 80
+  projected_patience: 12
+  head_C:
+  - 0.01
+  - 0.1
+  - 1.0
+  - 10.0
+  head_state_weight:
+  - 0.25
+  - 1.0
+  head_selection: inner_patient_AUROC_minus_0.2_Brier
+  baseline_predictions:
+    PaSCient: ${FROZEN_RESULTS}/drug_discovery_mm/pascient_kydar_metricfix_20260905/predictions.tsv
+    PERCEPTION: ${FROZEN_RESULTS}/drug_discovery_mm/perception_kydar/patient_predictions.tsv
+  shared_model_overrides:
+    use_recovery_basis: false
+    recovery_same_phase: false
+    recovery_coefficient_initial: 0.54
+    use_visit_tokens: false
+    meta_response_mean_loss_weight: 2.0
+    meta_response_direction_loss_weight: 0.5
+biology_analysis:
+  prediction_method: ImmuneTwins (full)
+  prediction_source: ${FROZEN_RESULTS}/drug_discovery_mm/task_adaptation_20260908/state_evaluation
+  programs:
+  - interferon_response
+  - cytotoxic_lymphocyte
+  - inflammatory_myeloid
+  - b_cell
+  - cell_cycle
+  source_visit: MM Post Induction 2-Cycles
+  target_visit: MM End Induction 1st Draw
+  raw_expression: per_cell_log1p_counts_per_10000_then_equal_cell_mean
+  decomposition: symmetric_composition_and_within_lineage_exact_identity
+  absent_lineage: carry_observed_other_visit_mean_with_zero_within_component
+  independent_unit: patient
+  seed: 42
+  bootstrap_resamples: 10000
+  permutation_resamples: 10000
+  multiple_testing: BH_within_all_reported_tests_of_each_named_family
+  orthogonal_validation:
+    source_page: https://apps.allenimmunology.org/aifi/insights/ndmm/downloads/clinical/
+    file: ${WORKSPACE}/data/ImmuneTwins/drug_discovery_mm/raw/GSE309595/clinical/ndmm_clinical_labs_and_metadata.tsv
+    visit_match: exact_patient_visit_and_days_no_nearest_visit_search
+    clinical_visit_field: sample.visitDetails_for_MM_milestones_otherwise_sample.visitName
+    non_MM_and_post_transplant_visits: excluded_before_lab_values_are_read
+    missing_values: paired_complete_cases_no_imputation_report_all_exclusions
+    cbc_monocyte_fraction: bc.monocyte_count_divided_by_monocyte_plus_lymphocyte_count
+    fixed_relations:
+    - - inflammatory_myeloid
+      - monocyte_fraction
+    - - cytotoxic_lymphocyte
+      - lymphocyte_fraction
+task:
+  name: patient_specific_myeloma_induction_state_forecasting
+  independent_unit: patient
+  current_state: PBMC_after_two_induction_cycles
+  completed_history: pretreatment_to_two_induction_cycles
+  future_target: end_of_induction_PBMC_state
+  treatment_actions:
+  - VRd
+  - VRd_Dara
+  primary_output: future_single_cell_treatment_state
+  auxiliary_response_cohort: GSE161195
+closure_evaluation:
+  metric_bandwidth_reference_root: ${FROZEN_RESULTS}/drug_discovery_mm/gse309595_state
+  endpoints:
+  - tb.perc_abnormal_flow
+  - tb.perc_abnormal_morph
+  target_visit: MM End Induction 1st Draw
+  baseline_visit: MM Pre-Treatment
+  transform: log1p_percent
+  missing_baseline_covariates: outer_training_median_and_missing_indicator_no_patient_exclusion
+  missing_outcomes: endpoint_specific_complete_cases_no_imputation
+  readout_ridge_alpha: 100.0
+  readout_features: pretreatment_burden_regimen_current_state_plus_future_change
+  future_state_decoder_training: measured_outer_training_future_only
+  bootstrap_unit: patient
+  bootstrap_resamples: 10000
+pretraining:
+  checkpoint: ${FROZEN_RESULTS}/age/simple_v1/attention/full_cima/checkpoint.pt
+  load_parameters:
+  - cell_projection
+  - pool
+  exclude_parameters:
+  - age_head
+  freeze: true
+data:
+  visits: ${WORKSPACE}/data/ImmuneTwins/drug_discovery_mm/manifests/gse309595/visits.tsv
+  transitions: ${WORKSPACE}/data/ImmuneTwins/drug_discovery_mm/manifests/gse309595/transitions.tsv
+  episodes: ${WORKSPACE}/data/ImmuneTwins/drug_discovery_mm/manifests/gse309595/episodes.tsv
+  uce_store: ${WORKSPACE}/data/ImmuneTwins/drug_discovery_mm/features/gse309595_uce_visits.h5
+  raw_count_store: ${WORKSPACE}/data/ImmuneTwins/drug_discovery_mm/features/gse309595_raw_counts.h5
+  development_cohort: GSE309595
+  external_cohort: NONE
+  cells_per_visit: 512
+  phase_by_drug:
+    VRd: 1
+    VRd_Dara: 2
+  latent_reference_root: ${FROZEN_RESULTS}/drug_discovery_mm/gse309595_state
+  output_root: ${REPO}/results/treatment/state
+model:
+  latent_dim: 16
+  transition_hidden_dim: 128
+  source_geometry_dim: 64
+  mean_program_rank: 7
+  covariance_program_rank: 11
+  operator_depth: 4
+  adapter_context_dim: 64
+  adapter_visit_slots: 2
+  adapter_context_layers: 1
+  adapter_context_heads: 4
+  adapter_rank: 8
+  adapter_scale: 0.5
+  use_recovery_basis: true
+  recovery_same_phase: true
+  recovery_coefficient_initial: 0.54
+  standardize_response_loss: true
+  use_visit_tokens: false
+optimization:
+  completed_transition_supervision: true
+  inner_folds: 3
+  weight_decay: 0.0001
+  set_transport_max_epochs: 300
+  set_transport_patience: 25
+  set_transport_learning_rate: 0.001
+  projected_set_max_epochs: 150
+  projected_set_patience: 15
+  projected_set_learning_rate: 0.0003
+  meta_adapter_max_epochs: 25
+  meta_adapter_patience: 12
+  meta_adapter_learning_rate: 0.001
+  meta_adapter_batch_size: 8
+  meta_adapter_epoch_selection: patient_weighted_common_curve
+  meta_adapter_learning_rates:
+  - 0.0003
+  - 0.001
+  device: cuda:0
+baselines:
+  future_state_methods:
+  - scGen
+  - CellOT
+  - trVAE
+  scgen_reference_protocol: baseline/vaccine_runners/11_run_scgen_baseline.py
+  source_lock: ${REPO}/baseline/vaccine_runners/SOURCE_LOCK.json
+  comparison_contract:
+    outer_split_unit: patient
+    inner_selection_unit: method_native_validation_within_outer_training_patients_only
+    primary_selection_metric: method_native_objective_within_outer_training_patients
+    identical_across_methods:
+    - biological_patient_and_endpoint
+    - outer_patient_folds_and_seed
+    - test_patient_predictions_and_metrics
+    - training_patient_only_selection
+    - local_execution_only_no_paper_reported_effects
+    method_native_and_not_forced_identical:
+    - gene_space_and_normalization_required_by_official_method
+    - model_objective_optimizer_and_learning_rate
+    - architecture_specific_epoch_limit
+    - available_training_supervision_and_history_reported_explicitly
+    ImmuneTwins_stage_selection:
+      SetTransport: patient_delta_RMSE
+      ProjectedSet: patient_MMD2
+      MetaAdapter: common_patient_weighted_delta_RMSE_curve
+  batch_size_cells: 1024
+  reference_profiles: baseline/vaccine_runners/common.py
+  scgen_max_epochs: 100
+  scgen_early_stopping_patience: 10
+  scgen_cell_type_policy: measured_native_labels_no_custom_clustering
+  trvae_max_epochs: 400
+  trvae_early_stopping_patience: 20
+  trvae_lr_patience: 13
+  cellot_inner_folds: 4
+  cellot_max_iterations: 100000
+  cellot_batch_size: 256
+  cellot_inner_iterations: 10
+  cellot_eval_every: 500
+  cellot_early_stopping_patience: 20
+  clinical_reference_profiles:
+    PERCEPTION:
+      source_commit: 6b1d48d866ea514e9d8bcec5d9820c89cbf75a10
+      core: official_rank_normalization_pretrained_carfilzomib_and_lenalidomide_models_pmin_and_weighted_resistant_clone_aggregation
+      calibration: nested_patient_held_out_Platt_scaling_for_Brier_only
+    PaSCient:
+      source_commit: e1c645fa4c43546fd4f03c948c170429034556d0
+      role: official_core_with_patient_dataset_adapter
+      architecture: Linear_28231_to_1024__Identity__LinearAttnAggregator__MLP_1024_512_512__Linear_512_2
+      objective: CrossEntropyLossViews_with_reciprocal_outer_training_class_counts
+      optimizer: Adam_lr_0.0001_weight_decay_0.0001
+      scheduler: ReduceLROnPlateau_factor_0.1_patience_20
+      max_epochs: 100
+      inner_folds: 3
+      epoch_selection: median_inner_selected_epoch_then_outer_training_patient_refit
+      fixed_common_cells_per_patient: 64
+      released_default_cells_per_patient: 100
+      result: ${FROZEN_RESULTS}/drug_discovery_mm/pascient_kydar_metricfix_20260905/method_by_metric.tsv
+      metric_lifecycle: reset_wrapper_and_child_on_each_train_and_validation_epoch
+evaluation:
+  patient_disjoint_outer_folds: 5
+  bootstrap_resamples: 10000
+  formal_state_metrics:
+  - MMD2
+  - Delta_RMSE
+  - Delta_MAE
+  - Delta_cosine
+  exploratory_clinical_metrics:
+  - RMSE_log1p_percent
+  - MAE_log1p_percent
+  - Spearman
+  common_clinical_readout: fixed_outer_training_future_change_ridge_conditional_on_known_clinical_and_current_state
+  diagnostic_controls:
+  - Persistence
+  - ImmuneTwins_shuffled_history

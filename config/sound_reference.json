@@ -1,0 +1,60 @@
+{
+  "schema_version": "sound_personal_reference_1",
+  "prepared_root": "${REPO}/artifacts/sound_reference",
+  "output_root": "${REPO}/results/sound_reference",
+  "inputs": {
+    "visit_metadata": "${EXTERNAL}/data/manifests/sound_visit_manifest.tsv",
+    "task_units": "${FROZEN_RESULTS}/baselines/vaccine_v2/vaccine_task_units.tsv",
+    "outer_splits": "${WORKSPACE}/vaccine_baseline_runtime/config/splits/sound_outer_groupkfold5_donors.tsv",
+    "inner_splits": "${WORKSPACE}/vaccine_baseline_runtime/config/splits/sound_inner_groupkfold4_donors.tsv",
+    "latents": "${WORKSPACE}/vaccine_baseline_runtime/latents/outer{fold}_{role}.h5",
+    "scales": "${WORKSPACE}/vaccine_baseline_runtime/scales/outer{fold}_all.npz",
+    "visit_manifest": "${WORKSPACE}/artifacts/ImmuneTwins/vaccine_immunetwin_v1/features/visit_features_489.tsv",
+    "sealed_source": "${WORKSPACE}/artifacts/ImmuneTwins/vaccine_bridge/source_visits_seed42.tsv",
+    "sealed_uce": "${WORKSPACE}/artifacts/ImmuneTwins/vaccine_bridge/uce_features_seed42.h5",
+    "cima": "${CIMA_CHECKPOINT}"
+  },
+  "neural_runs": {
+    "affine": "${FROZEN_RESULTS}/vaccine_immunetwin_v2/formal_set_transport_seed42/current/{task}/outer{fold}_seed42",
+    "current": "${FROZEN_RESULTS}/vaccine_immunetwin_v2/formal_projected_set_v0_1_seed42/current/{task}/outer{fold}_seed42",
+    "history_t2": "${FROZEN_RESULTS}/vaccine_immunetwin_v2/formal_meta_adapter_v1_seed42/{task}/outer{fold}_seed42",
+    "history_t3": "${FROZEN_RESULTS}/vaccine_immunetwin_v2/formal_meta_adapter_v1_1_seed42/{task}/outer{fold}_seed42"
+  },
+  "seed": 42,
+  "lambda_grid": [
+    0.25,
+    0.5,
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    "inf"
+  ],
+  "response_scale_bounds": [
+    0,
+    1.25
+  ],
+  "lineage_return_bounds": [
+    0,
+    1
+  ],
+  "lineage_return_selection": "positive_inner_donor_mmd_gain_with_95_percent_interval_above_zero",
+  "bootstrap_draws": 10000,
+  "resting_visits": [
+    "Flu Year 1 Day 0",
+    "Flu Year 2 Day 0",
+    "Flu Year 1 Day 90",
+    "Flu Year 2 Day 90",
+    "Immune Variation Day 0",
+    "Immune Variation Day 7",
+    "Immune Variation Day 90",
+    "Flu Year 1 Stand-Alone",
+    "Flu Year 2 Stand-Alone",
+    "Flu Year 3 Stand-Alone"
+  ],
+  "inner_root": "${REPO}/results/sound_reference/inner",
+  "reference_predictions": "${REPO}/results/sound_reference/predictions"
+}

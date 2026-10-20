@@ -1,0 +1,16 @@
+{
+  "schema_version": "immunetwins_vaccine_runner_source_lock_2",
+  "cell_scope": "all_cells",
+  "official_sources": {
+    "scgen": {
+      "commit": "d79e1f04233c30f9a4eb5b8d57718127909807d7"
+    },
+    "cellot": {
+      "commit": "522d2b953da8ad244fcf36f64521487fdf763788"
+    },
+    "scarches_trvae": {
+      "tag": "v0.5.1",
+      "tag_commit": "09c23f9489cd8a99cf6356548f471dfdbbe4bd5b"
+    }
+  }
+}

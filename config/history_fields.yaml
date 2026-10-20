@@ -1,0 +1,141 @@
+schema_version: sound_vaccine_history_fields_v1
+
+# Columns that may be used as model inputs.
+identifiers:
+  sample_id: sample.sampleKitGuid
+  donor_id: subject.subjectGuid
+  visit_name: sample.visitName
+
+leakage_guard:
+  reject_column_name_patterns:
+    - '(?i)(response|durability|future|target|outcome|endpoint)'
+    - '(?i)(fold[_-]?change|post[_-]?minus[_-]?pre|delta[_-]?(hai|igg|rna))'
+  reject_exact_columns:
+    - HAI_response
+    - HAI_durability
+    - IgG_response
+    - IgG_durability
+  preprocessing_fit_scope: outer_training_donors_only
+
+sources:
+  labs:
+    layout: wide
+    required_headers:
+      - sample.sampleKitGuid
+      - subject.subjectGuid
+      - sample.visitName
+    numeric_fields:
+      - sample.subjectAgeAtDraw
+      - am.bmi
+      - am.height
+      - am.weight
+      - chem.alt
+      - chem.albumin
+      - chem.alkaline_phosphatase
+      - chem.ast
+      - chem.t_bili
+      - chem.bun
+      - chem.calcium
+      - chem.co2
+      - chem.cl
+      - chem.creatinine
+      - chem.egfr_aa
+      - chem.egfr_non_aa
+      - chem.globin
+      - chem.glucose
+      - chem.potassium
+      - chem.protein
+      - chem.sodium
+      - bc.perc_basophils
+      - bc.perc_eosinophils
+      - bc.perc_lymphocytes
+      - bc.perc_monocytes
+      - bc.perc_neutrophils
+      - bc.basophil_count
+      - bc.eosinophil_count
+      - bc.lymphocyte_count
+      - bc.monocyte_count
+      - bc.neutrophil_count
+      - bc.hematocrit
+      - bc.hemoglobin
+      - bc.mch
+      - bc.mchc
+      - bc.mcv
+      - bc.mpv
+      - bc.platelet_count
+      - bc.red_blood_cell_count
+      - bc.rdw
+      - bc.wbc
+      - cmv.igg_serology
+      - infl.anti_ccp3
+      - infl.anti_ccp31
+      - infl.hs_crp
+      - infl.rf_iga_result
+      - infl.rf_igm_result
+      - infl.esr
+      - lip.cholesterol_hdl
+      - lip.cholesterol_ldl
+      - lip.cholesterol_non_hdl
+      - lip.cholesterol_total
+      - lip.chlesterol_hdl_ratio
+      - lip.triglycerides
+    transform: identity
+
+  hai:
+    layout: antigen_long
+    required_headers:
+      - sample.sampleKitGuid
+      - subject.subjectGuid
+      - sample.visitName
+      - msd.antigenSubtype
+      - msd.antigenName
+      - msd.antigenFullName
+      - msd.percentNormInhibition
+    category_field: msd.antigenSubtype
+    category_fallback_fields: [msd.antigenName, msd.antigenFullName]
+    categories: [H1N1, H3N2, Victoria, Yamagata, H7N9]
+    exclude_antigen_names: [BSA]
+    measurement_fields:
+      msd.percentNormInhibition: percent_inhibition
+    include_overall_mean: true
+    transform: identity
+
+  igg:
+    layout: antigen_long
+    required_headers:
+      - sample.sampleKitGuid
+      - subject.subjectGuid
+      - sample.visitName
+      - msd.antigenSubtype
+      - msd.antigenName
+      - msd.antigenFullName
+      - msd.concMean
+    category_field: msd.antigenSubtype
+    category_fallback_fields: [msd.antigenName, msd.antigenFullName]
+    categories: [H1N1, H3N2, Victoria, Yamagata]
+    exclude_antigen_names: [BSA]
+    measurement_fields:
+      msd.concMean: concentration
+    include_overall_mean: true
+    transform: log1p
+
+# Support-set columns available to the history adapter for each task.
+tasks:
+  T1:
+    aliases: [T1_first_response]
+    query_role: year1_D0
+    target_role: year1_D7
+    allowed_support_transitions: []
+  T2:
+    aliases: [T2_same_episode_recovery]
+    query_role: same_season_D7
+    target_role: same_season_D90
+    allowed_support_transitions:
+      - {source_role: same_season_D0, target_role: same_season_D7}
+  T3:
+    aliases: [T3_cross_year_recovery]
+    query_role: year2_D0
+    target_role: year2_D90
+    allowed_support_transitions:
+      - {source_role: year1_D0, target_role: year1_D7}
+      - {source_role: year1_D7, target_role: year1_D90}

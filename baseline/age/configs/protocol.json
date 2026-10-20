@@ -1,0 +1,179 @@
+{
+  "protocol_version": "official-cima-age-v3",
+  "runtime_environments": {
+    "uce": {
+      "source": "models/UCE/requirements.txt",
+      "official_python": "not pinned by release",
+      "official_torch": "2.1.1"
+    },
+    "pulsar": {
+      "source": "models/PULSAR-code/pyproject.toml",
+      "official_python": ">=3.13",
+      "official_torch": ">=2.8.0"
+    },
+    "pascient": {
+      "source": "external_models_0714/pascient/env.yml",
+      "official_python": "3.11.5",
+      "official_cuda": "12.1"
+    },
+    "scphase": {
+      "source": "release imports plus README installation instruction",
+      "official_python": ">=3.8",
+      "official_lockfile": null
+    }
+  },
+  "runtime_path_resolution": {
+    "base_environment_variable": "IMMUNETWINS_WORKSPACE_ROOT",
+    "scope": "All relative input, upstream-checkout, checkpoint, log and result paths in this protocol resolve under the runtime workspace, not under the Git repository.",
+    "default": "the repository parent directory, outside the standalone Git worktree"
+  },
+  "training_cohort": {
+    "name": "CIMA",
+    "donor_count": 417,
+    "manifest": "data/patient_encoder_feasibility/manifests/cima_417_donors.tsv",
+    "raw_h5ad": "data/raw/cima/CIMA_RNA_6484974cells_36326genes_20250811.h5ad",
+    "counts_layer": "counts",
+    "donor_key": "sample",
+    "age_key": "age",
+    "batch_key": "RNA_experiment",
+    "common_split_environment_variable": "IMMUNETWINS_CIMA_FOLDS",
+    "common_split_fallback": "data/cima_random_donor.tsv",
+    "common_split_repeat": 0
+  },
+  "external_protocol": {
+    "type": "CIMA-only frozen zero-shot",
+    "prediction_columns": [
+      "method",
+      "cohort",
+      "donor_id",
+      "predicted_age"
+    ]
+  },
+  "external_cohorts": {
+    "Immunobiology": {
+      "manifest_environment_variable": "IMMUNETWINS_EXTERNAL_AGE_LABELS",
+      "manifest_fallback": "data/manifests/immunobiology_aging_234_donors.tsv",
+      "raw_h5ad": "data/raw/immunobiology_aging/expression/imm-of-aging_all_cells_cellxgene_924554e2.h5ad",
+      "counts_slot": "raw.X",
+      "donor_count": 234
+    },
+    "OneK1K": {
+      "raw_h5ad": "data/external/onek1k/OneK1K_1e44db10/raw/OneK1K_1e44db10.h5ad",
+      "raw_h5ad_bytes": 4434273970,
+      "raw_cells": 1248980,
+      "donor_count": 981,
+      "counts_slot": "X",
+      "fixed_view": "data/external/onek1k/fixed_view/onek1k_seed20260711_max1500_raw_counts.h5",
+      "fixed_view_cells": 1201946
+    }
+  },
+  "methods": {
+    "PULSAR": {
+      "paper_label": "PULSAR",
+      "official_repo": "models/PULSAR-code",
+      "official_commit": "7442e4e7f17e0d3bbf5e15737e127d66979fd08b",
+      "official_model": "models/PULSAR/model.safetensors",
+      "cell_encoder_repo": "models/UCE",
+      "cell_encoder_commit": "9c416007be15ad6753dc84af4468c1dc10421ab9",
+      "cell_encoder_weight": "models/UCE/model_files/4layer_model.torch",
+      "cell_encoder_expected_bytes": 3403514339,
+      "official_uce_rng": {
+        "gene_token_sampler": "numpy.random.choice",
+        "numpy_seed_set_by_release": false
+      },
+      "official_age_rule": {
+        "cells_per_donor": 1024,
+        "sampling_replace": true,
+        "sampling_seed": 0,
+        "candidate_universe_rule": "the frozen project input view is encoded by UCE first; released seed-0 replace-true sampling then draws 1024 cells per donor",
+        "project_input_views": "CIMA natural_1024 seed 20260711, Immunobiology official_1500 seed 20260711, and OneK1K deterministic up-to-1500 seed 20260711",
+        "effective_uce_filter_order": "first gene min_cells=10 -> first cell min_genes=25 -> case-insensitive PE gene intersection; the released second filter call mutates discarded ad, not returned adata, and is not applied as an intended bug fix",
+        "donor_embedding_dim": 512,
+        "regressor": "sklearn.linear_model.Ridge",
+        "alpha": 0.1,
+        "official_native_split": {
+          "test_size": 0.2,
+          "random_state": 0
+        }
+      },
+      "external_fit": "same Ridge alpha on all 417 CIMA donors, then freeze"
+    },
+    "PaSCient": {
+      "paper_label": "PaSCient",
+      "official_repo": "external_models_0714/pascient",
+      "official_commit": "e1c645fa4c43546fd4f03c948c170429034556d0",
+      "official_entrypoint": "pascient/scripts/train.py",
+      "cima_continuous_task_adapter": {
+        "label_type": "continuous",
+        "loss": "baseline.age.adapters.pascient_loss.PatientMSELossViews",
+        "cells_per_donor": 1500,
+        "epochs": 4,
+        "batch_size": 32,
+        "seed": 12345,
+        "optimizer": "Adam",
+        "learning_rate": 0.0001,
+        "weight_decay": 0.0001,
+        "normalization": "log1p(CP10K)",
+        "gene_order": "external_models_0714/pascient/data/gene_order.tsv",
+        "gene_order_n_genes": 28231,
+        "cima_alignment": "preserve released gene_order order and omit source-absent genes exactly as released align_gene_space",
+        "external_alignment": "reuse the exact frozen CIMA input order and zero-fill target-source-absent columns solely to preserve the trained input dimension",
+        "cell_filter": "filter source-space total_counts == 0 as in the released multilabel query; preserve cells that become all-zero only after gene alignment"
+      },
+      "data_adapter": "baseline.age.adapters.pascient_cima_datamodule.CIMAPaSCientDataModule",
+      "official_train_call": "pascient.scripts.train.train",
+      "continuous_scaler": "released per-cell pandas ddof=1 rule fit on CIMA training-fold cells only",
+      "loss_shape_adaptation": {
+        "correction": "identical [N,D] prediction/target shapes within each view; view means unchanged",
+        "target_before_loss": "[N,1]",
+        "target_after_MSELossViews_unsqueeze": "[N,1,1]",
+        "prediction_per_view": "[N,1]",
+        "broadcast_result": "[N,N,1]"
+      },
+      "checkpoint_selection": "fixed released epoch-4 last.ckpt for CIMA OOF and external inference",
+      "external_fit": "full-CIMA checkpoint for external prediction; outer-fold models for CIMA OOF evaluation",
+      "role": "official-code continuous-age adaptation; no author-released age experiment configuration exists"
+    },
+    "scPhase": {
+      "paper_label": "scPhase",
+      "official_repo": "external_models_official/scPhase",
+      "official_commit": "cb21b1a5175f5b7630af183ac8ac1b58d5204426",
+      "official_config": "external_models_official/scPhase/configs/config_age.json",
+      "official_age_preprocessing": {
+        "source": "external_models_official/scPhase/notebooks/1_data_preprocessing/Age/1.1_data_preprocess.py",
+        "input_state": "not documented by release; all_pbmcs_rna.h5ad is read and used directly",
+        "hvg": "scanpy.pp.highly_variable_genes, n_top_genes=5000, flavor=cell_ranger, min_mean=0.0125, max_mean=3, min_disp=0.5, CIMA batch_key=RNA_experiment",
+        "scale": "scanpy.pp.scale(zero_center=True, max_value=10)",
+        "normalize_total": false,
+        "log1p": false,
+        "executed_input_view": "fixed 1500 cells per donor: 625500 CIMA cells and 351000 Immunobiology cells",
+        "executed_hvg_fallback": "global CIMA cell_ranger after all-zero gene removal when batch-aware Scanpy quantiles failed",
+        "external_missing_hvg_rule": "zero-fill the 1230 source-absent frozen CIMA HVGs before applying frozen CIMA scaling"
+      },
+      "internal_tracks": {
+        "official_native": "retain real donor-constant CIMA RNA_experiment groups; released runner selects LeaveOneGroupOut (50 groups in the frozen cohort)",
+        "common_OOF": "set one synthetic group only in the explicit donor-order adapter; released runner then selects shuffled KFold(5, seed=3407)"
+      },
+      "external_transform": "reuse the ordered CIMA HVGs and CIMA-fitted mean/std, then apply the released scale transform",
+      "external_fit": "ensemble the five common-KFold checkpoints",
+      "formal_storage_contract": "scphase_per_donor_lazy_dense_float32_v1",
+      "loader_adapter": "runtime_symbol_patch_no_cache_lazy_dense"
+    },
+    "IDEAL-Age": {
+      "paper_label": "IDEAL-Age",
+      "formal_variant": "complete pseudo-bulk AutoGluon FASTAI/NN_TORCH plus DeepSets-Attention ensemble",
+      "official_repo": "models/ImmuneTwins/baselines/IDEAL-Age",
+      "official_commit": "d419455549907f70da55ac3fd39021045a061819",
+      "official_tag": "1.2.1",
+      "official_entrypoint": "ag_integrat_gene_mae_sweep.py",
+      "formal_runner": "baseline/age/adapters/run_ideal_age_full_ensemble.py"
+    },
+    "UCE": {
+      "internal_name": "UCE",
+      "paper_label": "UCE",
+      "patient_level_rule": "apply one CIMA-fitted unregularized linear age readout to each official UCE cell embedding, then take the arithmetic mean of cell predictions within donor",
+      "donor_level_ridge": false,
+      "external_preprocessing": "CIMA gene mask and UCE-supported gene identifiers"
+    }
+  }
+}
